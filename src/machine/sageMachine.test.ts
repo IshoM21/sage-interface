@@ -72,6 +72,16 @@ describe("sageMachine", () => {
   });
 });
 
+describe("danger", () => {
+  it("flags dangerous questions only", () => {
+    const a = start();
+    a.send({ type: "agent.question", message: "rm -rf ./build", danger: true });
+    expect(a.getSnapshot().context.danger).toBe(true);
+    a.send({ type: "agent.question", message: "Read 3 files?" });
+    expect(a.getSnapshot().context.danger).toBe(false);
+  });
+});
+
 describe("retry", () => {
   it("counts retries without leaving the current state", () => {
     const a = start();
@@ -80,6 +90,19 @@ describe("retry", () => {
     a.send({ type: "agent.retry" });
     expect(a.getSnapshot().context.retries).toBe(2);
     expect(selectAgentState(a.getSnapshot())).toBe("EXECUTING");
+  });
+});
+
+describe("report", () => {
+  it("counts tools and retries for the task, resets on ready", () => {
+    const a = start();
+    a.send({ type: "tool.started", tool: "read_file" });
+    a.send({ type: "tool.started", tool: "npm test" });
+    a.send({ type: "agent.retry" });
+    expect(a.getSnapshot().context.toolsRun).toBe(2);
+    expect(a.getSnapshot().context.taskRetries).toBe(1);
+    a.send({ type: "agent.ready" });
+    expect(a.getSnapshot().context.toolsRun).toBe(0);
   });
 });
 

@@ -6,6 +6,7 @@ export const criticalVisual: StateVisual = {
   state: "CRITICAL",
   palette: PALETTES.CRITICAL,
   params: {
+    shards: 0.55, shardSpeed: 0.9, network: 0.3,
     camDolly: 0.02, camOrbit: 0.5, camSway: 1, camShake: 0.7,
     energy: 0.95, coreGlow: 0.8, coreBreathAmp: 0.16, coreBreathRate: 1.4, coreShake: 1,
     seed: 0.5, unfold: 0.8, script: 0.6, scriptSpeed: -0.2, sealTilt: 0.4,

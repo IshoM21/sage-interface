@@ -25,6 +25,10 @@ export interface VisualParams {
   /** Rotating script ring visibility and speed. */
   script: number;
   scriptSpeed: number;
+  /** 0..1 — the script ring locks and turns in heavy mechanical steps (dangerous decision). */
+  scriptStep: number;
+  /** 0..1 — amber countdown line tracing the seal while a decision is pending. */
+  countdown: number;
   /** Seal plane tilt amount (3D sway). */
   sealTilt: number;
 
@@ -54,6 +58,12 @@ export interface VisualParams {
   converge: number;
   /** Falling light (the "Understood" frame). */
   rain: number;
+  /** Kanji of thought drifting through depth (analysis). */
+  kanjiField: number;
+  /** Background fill: data shards (density), their travel speed, and the beaded line network. */
+  shards: number;
+  shardSpeed: number;
+  network: number;
 
   /** Prismatic lens flares and bloom strength. */
   flare: number;
@@ -84,15 +94,15 @@ export type ParamKey = keyof VisualParams;
 
 export const BASE_PARAMS: VisualParams = {
   energy: 0.8, coreGlow: 0.4, coreBreathAmp: 0.06, coreBreathRate: 0.12, coreShake: 0, heartbeat: 0,
-  seed: 1, unfold: 0, script: 0, scriptSpeed: 0.05, sealTilt: 0.35,
+  seed: 1, unfold: 0, script: 0, scriptSpeed: 0.05, scriptStep: 0, countdown: 0, sealTilt: 0.35,
   armillary: 0, armSpeed: 0.2, armStep: 0, armAlign: 0, armJitter: 0, fragment: 0,
   tunnel: 0, tunnelSpeed: 0, panels: 0,
-  stars: 0.6, motes: 0.1, orbit: 0.1, inflow: 0, turbulence: 0.15, expel: 0, converge: 0, rain: 0,
+  stars: 0.6, motes: 0.1, orbit: 0.1, inflow: 0, turbulence: 0.15, expel: 0, converge: 0, rain: 0, kanjiField: 0, shards: 0.2, shardSpeed: 0.15, network: 0.1,
   flare: 0, bloom: 0.6, nebula: 0.35, nebulaSwirl: 0.1,
   modules: 0,
   pulseRate: 0, pulseStrength: 0,
   camDolly: 0, camOrbit: 0.25, camSway: 0.5, camShake: 0,
-  glitch: 0, aberration: 0, invert: 0, grain: 0.02, vignette: 0.75,
+  glitch: 0, aberration: 0.22, invert: 0, grain: 0.02, vignette: 0.75,
 };
 
 export type RateMap = Partial<Record<ParamKey, number>>;

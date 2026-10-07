@@ -1,4 +1,5 @@
 import { assign, setup } from "xstate";
+import { MILESTONE_LEAD } from "../shared/milestone";
 import { toolToModule, type SageEvent, type ToolModule } from "./events";
 
 export interface Milestone {
@@ -13,16 +14,23 @@ export interface SageContext {
   activeModule: ToolModule | null;
   completedModules: ToolModule[];
   milestone: Milestone | null;
+  /** The pending QUESTION is about a dangerous / destructive operation. */
+  danger: boolean;
   /** Monotonic retry counter (each `agent.retry` plays the "repeating attempt" beat). */
   retries: number;
+  /** Tools started during the current task (feeds the 報告 report). */
+  toolsRun: number;
+  /** Retries during the current task. */
+  taskRetries: number;
   /** COMPLETE returns to READY automatically after a few seconds. */
   autoReturn: boolean;
 }
 
 /** Duration of the convergence choreography before COMPLETE text appears. */
 export const COMPLETE_CONVERGE_MS = 1250;
-export const COMPLETE_HOLD_MS = 3200;
-export const MILESTONE_MS = 5600;
+export const COMPLETE_HOLD_MS = 4400;
+/** Whole milestone: white immersion lead + gold ceremony. */
+export const MILESTONE_MS = Math.round(MILESTONE_LEAD * 1000) + 5600;
 
 /**
  * Sage state machine.
@@ -39,7 +47,7 @@ export const sageMachine = setup({
     events: {} as SageEvent,
   },
   actions: {
-    clearTask: assign({ activeModule: null, completedModules: [], message: "" }),
+    clearTask: assign({ activeModule: null, completedModules: [], message: "", toolsRun: 0, taskRetries: 0 }),
   },
   guards: {
     autoReturn: ({ context }) => context.autoReturn,
@@ -53,12 +61,20 @@ export const sageMachine = setup({
     activeModule: null,
     completedModules: [],
     milestone: null,
+    danger: false,
     retries: 0,
+    toolsRun: 0,
+    taskRetries: 0,
     autoReturn: true,
   },
   on: {
     "ui.setAutoReturn": { actions: assign({ autoReturn: ({ event }) => event.value }) },
-    "agent.retry": { actions: assign({ retries: ({ context }) => context.retries + 1 }) },
+    "agent.retry": {
+      actions: assign({
+        retries: ({ context }) => context.retries + 1,
+        taskRetries: ({ context }) => context.taskRetries + 1,
+      }),
+    },
   },
   states: {
     agent: {
@@ -71,6 +87,7 @@ export const sageMachine = setup({
           target: ".executing",
           actions: assign({
             activeModule: ({ event }) => toolToModule(event.tool),
+            toolsRun: ({ context }) => context.toolsRun + 1,
             message: ({ event }) => event.tool,
           }),
         },
@@ -84,7 +101,10 @@ export const sageMachine = setup({
             },
           }),
         },
-        "agent.question": { target: ".question", actions: assign({ message: ({ event }) => event.message }) },
+        "agent.question": {
+          target: ".question",
+          actions: assign({ message: ({ event }) => event.message, danger: ({ event }) => event.danger ?? false }),
+        },
         "agent.warning": { target: ".warning", actions: assign({ message: ({ event }) => event.message }) },
         "agent.failed": { target: ".critical", actions: assign({ message: ({ event }) => event.error }) },
         "agent.completed": {

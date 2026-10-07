@@ -6,8 +6,9 @@ export const executingVisual: StateVisual = {
   state: "EXECUTING",
   palette: PALETTES.EXECUTING,
   params: {
+    shards: 0.85, shardSpeed: 1.9, network: 0.7,
     camDolly: 0.06, camOrbit: 0.35, camSway: 0.3, camShake: 0.12,
-    energy: 1.05, coreGlow: 0.9, coreBreathAmp: 0.04, coreBreathRate: 1.1,
+    kanjiField: 0.25, energy: 1.05, coreGlow: 0.9, coreBreathAmp: 0.04, coreBreathRate: 1.1,
     seed: 0.3, unfold: 1, script: 0.8, scriptSpeed: 0.35, sealTilt: 0.15,
     armillary: 1, armSpeed: 0.5, armStep: 1, tunnel: 1, tunnelSpeed: 1.8, panels: 0.7,
     stars: 0.9, motes: 0.4, orbit: 0.3, turbulence: 0.08,

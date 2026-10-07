@@ -25,6 +25,7 @@ export class CoreSystem implements VisualSystem {
   private phase = 0;
   private flashV = 0;
   private flashRole: number = ROLE.core;
+  private lastBeat = 0;
 
   constructor(ctx: EngineContext) {
     const t = ctx.textures;
@@ -47,6 +48,8 @@ export class CoreSystem implements VisualSystem {
     this.phase += dt * p.coreBreathRate * TAU;
     // Heartbeat: lub-dub every 1.6 s.
     const hbT = (time % 1.6) / 1.6;
+    if (p.heartbeat > 0.5 && hbT < this.lastBeat) ctx.bus.cue({ type: "heartbeat" });
+    this.lastBeat = hbT;
     const beat = p.heartbeat * (Math.exp(-(((hbT - 0.02) * 16) ** 2)) + 0.6 * Math.exp(-(((hbT - 0.16) * 16) ** 2)));
     const breath = 1 + Math.sin(this.phase) * p.coreBreathAmp + beat * 0.22;
     this.flashV = damp(this.flashV, 0, 3, dt);

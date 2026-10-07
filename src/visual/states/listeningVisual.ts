@@ -6,6 +6,7 @@ export const listeningVisual: StateVisual = {
   state: "LISTENING",
   palette: PALETTES.LISTENING,
   params: {
+    shards: 0.45, shardSpeed: 0.35, network: 0.35,
     camDolly: 0.05, camOrbit: 0.3, camSway: 0.5,
     energy: 0.95, coreGlow: 0.6, coreBreathAmp: 0.1, coreBreathRate: 0.3,
     seed: 1, unfold: 0.55, script: 0.35, scriptSpeed: 0.08, sealTilt: 0.3,

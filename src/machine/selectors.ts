@@ -28,3 +28,12 @@ export const selectSummary = (s: SageSnapshot) => s.context.summary;
 export const selectActiveModule = (s: SageSnapshot) => s.context.activeModule;
 export const selectAutoReturn = (s: SageSnapshot) => s.context.autoReturn;
 export const selectRetries = (s: SageSnapshot) => s.context.retries;
+/** A pending QUESTION about a dangerous operation (drives the mechanical seal). */
+export const selectDanger = (s: SageSnapshot) => s.matches({ agent: "question" }) && s.context.danger;
+/** Data for the 報告 report shown on completion. */
+export const selectReport = (s: SageSnapshot) => ({
+  summary: s.context.summary,
+  tools: s.context.toolsRun,
+  retries: s.context.taskRetries,
+  modules: s.context.completedModules.length,
+});

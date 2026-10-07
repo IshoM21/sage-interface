@@ -6,6 +6,7 @@ export const completeVisual: StateVisual = {
   state: "COMPLETE",
   palette: PALETTES.COMPLETE,
   params: {
+    shards: 0.5, shardSpeed: 0.25, network: 0.45,
     camDolly: -0.06, camOrbit: 0.15, camSway: 0.2,
     energy: 1, coreGlow: 1, coreBreathAmp: 0.05, coreBreathRate: 0.2,
     seed: 0.2, unfold: 1, script: 0.7, scriptSpeed: 0.03, sealTilt: 0,

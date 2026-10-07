@@ -84,7 +84,7 @@ export function eventForState(state: SageState, opts: { warning: string; module?
       return { type: "tool.started", tool: TOOL_NAMES[m] };
     }
     case "QUESTION":
-      return { type: "agent.question", message: "ALLOW COMMAND · rm -rf ./build" };
+      return { type: "agent.question", message: "ALLOW · read 3 files in src/auth" };
     case "COMPLETE":
       return { type: "agent.completed", summary: "ANALYSIS COMPLETE" };
     case "WARNING":
@@ -95,3 +95,6 @@ export function eventForState(state: SageState, opts: { warning: string; module?
 }
 
 export { TOOL_NAMES };
+
+/** Mock of a dangerous approval request (mechanical seal). */
+export const DANGER_QUESTION = { type: "agent.question", message: "ALLOW COMMAND · rm -rf ./build", danger: true } as const;

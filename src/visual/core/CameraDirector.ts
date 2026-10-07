@@ -38,8 +38,11 @@ export class CameraDirector {
   private sum: Record<CameraChannel, number> = { dolly: 0, roll: 0, panX: 0, panY: 0, fov: 0, shake: 0 };
   /** Base distance that fits the field in the window (set on resize). */
   fitDistance = 13;
+  /** Called when a forceful push/pull is fired (for audio sync). */
+  onPunch: ((amount: number) => void) | null = null;
 
   move(m: CameraMove): void {
+    if (m.style === "punch" && m.channel === "dolly" && Math.abs(m.amount) >= 0.1) this.onPunch?.(Math.abs(m.amount));
     if (this.moves.length >= MAX_MOVES) this.moves.shift();
     this.moves.push({ hold: 0, style: "smooth", ...m, t: 0 });
   }

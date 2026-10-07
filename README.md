@@ -10,16 +10,20 @@ Estado actual: **POC visual (v2, Three.js)**. Los ocho estados, transiciones, AU
 
 | Estado | Escena | Tarjeta |
 |---|---|---|
-| READY | sólo la **semilla**: doble cuadrado fino inclinado en el vacío | 待機 Standing by |
-| LISTENING | la semilla se despliega, la luz fluye hacia dentro, despiertan las bandas | 聴取 Listening |
-| ANALYZING | túnel con paneles, bandas armilares en todos los ejes, sello y anillo de escritura completos | 解析 Analyzing |
-| EXECUTING | más velocidad, bandas en pasos mecánicos, sellos de módulo (READ…TEST) | 実行 Executing |
-| QUESTION | todo se detiene; el sello gira para mirarte de frente | 問 Question |
-| COMPLETE | convergencia, bandas alineadas en un plano, flash, lluvia de luz azul | 了 Understood |
+| READY | sólo la **semilla**: doble cuadrado fino inclinado en el vacío; pocos fragmentos de datos | 待機 Standing by |
+| LISTENING | la semilla se despliega, la luz fluye hacia dentro, aparece la red de líneas | 聴取 Listening |
+| ANALYZING | un **iris** se abre; túnel, bandas armilares, sello completo, **kanji flotando** en profundidad, fondo lleno (fragmentos, polvo, red de líneas punteadas, arcos) | 解析 Analyzing |
+| EXECUTING | más velocidad, bandas en pasos mecánicos, sellos de módulo (READ…TEST), fragmentos volando | 実行 Executing |
+| QUESTION | todo se congela; **▸YES / NO** en serif (←/→, Enter, Esc) | 問 Question |
+| QUESTION peligrosa | el sello "se pone serio": entorno a negro, anillo de escritura a pasos pesados, cuenta atrás ámbar, rombo 告 fijo | 告 Warning |
+| COMPLETE | convergencia, flash, lluvia de luz y **reporte 報告** que suma resultados uno a uno | 報告 |
 | WARNING | pulsos ámbar que transforman la escena por tramos, bandas que oscilan | 警告 Warning |
-| CRITICAL | inversión a papel y rojo, datamosh, fragmentación, luz expulsada | 失敗 Failed |
-| retry | «Failed. Repeating attempt.»: inversión y frame repetido en cuadrícula | 再度実行 |
-| milestone | ceremonia dorada: anillo de escritura ornamentado, dodecágono, rayos | 獲得 Ultimate skill |
+| CRITICAL | **interludio de datos corruptos**, luego inversión a papel y rojo, datamosh, fragmentación | 失敗 Failed |
+| retry | ciclo completo: glitch → 失敗 → 再度実行 → nuevo intento; desde el 3.º seguido, montaje en cuadrícula | 再度実行 |
+| milestone | **inmersión en blanco** y ceremonia dorada: anillo ornamentado, dodecágono, rayos | 獲得 Ultimate skill |
+| arranque | **identidad**: nace el rombo, se ensambla el kanji (`src/config/identity.ts`, por defecto 叡) y se teclea el nombre | 叡 |
+
+Emblemas: el **disco blanco** (kanji negros) es la forma de Gran Sabio para respuestas y confirmaciones; el **rombo** se reserva para advertencias (告). El texto de cada tarjeta se **ensambla** carácter a carácter, con sonido sincronizado.
 
 ---
 
@@ -66,7 +70,10 @@ cd src-tauri && cargo test   # serialización de AgentEvent en Rust
 | `T` | FULL TOUR (incluye QUESTION, WARNING y MILESTONE) |
 | `M` | MILESTONE / SKILL ACQUIRED |
 | `R` | beat de reintento (`agent.retry`) |
-| `Enter` / `Esc` | ACCEPT / REJECT en QUESTION |
+| `S` | sonido on/off (el volumen está en el panel de controles) |
+| `9` | pregunta peligrosa (`agent.question` con `danger: true`) |
+| `I` | repetir la secuencia de identidad |
+| `←/→`, `Enter`, `Esc` | elegir YES/NO, confirmar, responder NO (en QUESTION) |
 | `D` / `C` / `H` | debug / controles / ocultar toda la UI |
 | `Q` | cicla calidad LOW → MEDIUM → HIGH → ULTRA |
 | `F` | pantalla completa |
@@ -94,6 +101,7 @@ React (UI, 0 renders por frame)
 
 ```
 src/
+  audio/          AudioEngine (síntesis Web Audio), profiles (diseño sonoro por estado)
   app/            App.tsx, estilos, catálogo de estados (copy UI), fullscreen
   machine/        events.ts (AgentEvent), sageMachine.ts, selectors.ts, tests
   agent/          AgentBridge, MockAgentBridge, TauriAgentBridge, scenarios
@@ -136,6 +144,15 @@ src-tauri/src/
    - programa **cues** (flash, shockwaves, overrides temporales) y **movimientos de cámara / cortes**. Ej. COMPLETE: el túnel desacelera → la luz converge → las bandas se alinean en un plano → flash → onda radial → lluvia de luz → (UI) tarjeta 了 a los 1.25 s, sincronizada con el subestado `complete.resolved` de la máquina.
 
 ---
+
+## Sonido
+
+Todo el audio es **procedural** (Web Audio API): no hay archivos de sonido, ~25 KB de código y <1 % de CPU. Vive en `src/audio/`:
+
+- `AudioEngine.ts` — drone ambiental (5 voces → filtro con LFO → saturación opcional), reverb con respuesta al impulso generada, compresor, y efectos sintetizados: campanilla FM (cada línea de voz), golpe grave (tarjetas), fizz (cortes), whoosh (golpes de cámara), boom (ondas), glitch (fallos/reintentos), latido (QUESTION), arpegio y acorde (milestone).
+- `profiles.ts` — el diseño sonoro por estado: notas del drone, filtro, aire, chispas (pensar), ticks mecánicos (actuar), saturación (fallo).
+- **Sincronía:** el motor visual emite *cues* semánticos al fotograma exacto (`VisualEngine.onCue`: `cut`, `punch`, `shock`, `pulse`, `retryStep`, `milestone`, `heartbeat`…). El audio sólo escucha esos cues; el motor visual no sabe nada de sonido.
+- El navegador/WebView exige un gesto del usuario para iniciar audio: arranca con la primera tecla o clic. Volumen y silencio se guardan en `localStorage`.
 
 ## Cómo añadir un nuevo estado
 
@@ -223,4 +240,4 @@ Medido en Chrome (Metal) a 2880×1800, DPR 2, calidad HIGH: **60 FPS** en los 8 
 3. **Adaptadores (`AgentAdapter`):** traducir la salida de cada CLI a `AgentEvent`. Preferir canales estructurados cuando existan (p. ej. salida JSON/stream o hooks del agente) antes que parsear texto ANSI.
 4. **Aprobaciones reales:** `ui.accept`/`ui.reject` → comando Rust que responde al prompt del agente.
 5. **Más retroalimentación del agente:** mapear progreso real (archivos leídos, tests pasando) a parámetros (`unfold`, densidad de paneles) para que la escena refleje el trabajo, no sólo el estado.
-6. **Sonido:** un tono cristalino al aparecer cada línea de voz y cada tarjeta.
+6. **Voz:** frases fijas pregeneradas («Notice.», «Answer.», «Understood.»…) con tratamiento de "sistema", disparadas por los mismos cues que el sonido.

@@ -23,11 +23,14 @@ import { PaletteField } from "./core/PaletteField";
 import { ParamController } from "./core/params";
 import { createSharedTextures } from "./core/textures";
 import { TransitionController } from "./core/TransitionController";
-import type { EngineContext, VisualBus, VisualSignals, VisualSystem } from "./core/types";
+import type { EngineContext, VisualBus, VisualCue, VisualSignals, VisualSystem } from "./core/types";
 import { compositeShader } from "./shaders/ShaderManager";
 import { ArmillarySystem } from "./systems/ArmillarySystem";
 import { BackgroundSystem } from "./systems/BackgroundSystem";
 import { CoreSystem } from "./systems/CoreSystem";
+import { DataDumpSystem } from "./systems/DataDumpSystem";
+import { KanjiFieldSystem } from "./systems/KanjiFieldSystem";
+import { FieldSystem } from "./systems/FieldSystem";
 import { FlareSystem } from "./systems/FlareSystem";
 import { MilestoneSystem } from "./systems/MilestoneSystem";
 import { ModuleSystem } from "./systems/ModuleSystem";
@@ -79,6 +82,8 @@ export class VisualEngine {
   private milestoneSys!: MilestoneSystem;
 
   private pointerTarget = { x: 0, y: 0 };
+  private cueListeners = new Set<(c: VisualCue) => void>();
+  private lastGlitch = 0;
   private flashV = 0;
   private flashRole: number = ROLE.core;
   private lastRetries = 0;
@@ -117,9 +122,14 @@ export class VisualEngine {
     this.camera.position.set(0, 0, 13);
 
     const bus: VisualBus = {
-      shockwave: (o) => this.shockwaves.spawn(o),
+      cue: (c) => this.emit(c),
+      shockwave: (o) => {
+        this.emit({ type: "shock", strength: o.strength ?? 0.6 });
+        this.shockwaves.spawn(o);
+      },
       burst: (x, y, n, speed, role, life) => this.motes.burst(x, y, n, speed, role, life),
       flash: (amount, role = ROLE.core) => {
+        this.emit({ type: "flash", amount });
         this.flashV = Math.min(1.4, this.flashV + amount);
         this.flashRole = role;
         this.core.flash(amount, role);
@@ -143,7 +153,7 @@ export class VisualEngine {
       state: "READY",
       prevState: "READY",
       stateTime: 0,
-      signals: { activeModule: null, completedModules: [], retries: 0 },
+      signals: { activeModule: null, completedModules: [], retries: 0, danger: false },
       bus,
     };
     const ctx = this.ctx;
@@ -160,13 +170,19 @@ export class VisualEngine {
     this.core = new CoreSystem(ctx);
     this.motes = new MoteSystem(ctx);
     const flares = new FlareSystem(ctx);
+    const dataDump = new DataDumpSystem(ctx);
+    const kanjiField = new KanjiFieldSystem(ctx);
+    const field = new FieldSystem(ctx);
+    this.cueListeners.add((c) => c.type === "corrupt" && dataDump.play(c.duration));
+    this.director.onPunch = (amount) => this.emit({ type: "punch", amount });
     this.shockwaves.onPulse = (s) => {
+      this.emit({ type: "pulse", strength: s });
       this.armillary.pulse(s);
       this.director.move({ channel: "shake", amount: 0.03 * s, attack: 0.03, release: 0.35, style: "punch" });
       if (ctx.params.expel > 0.3) bus.burst(0, 0, 50, 6, ROLE.secondary, 1);
     };
     this.systems = [
-      background, tunnel, rain, seal, modules, this.armillary, this.shockwaves, this.milestoneSys, this.core, this.motes, flares,
+      background, tunnel, rain, seal, modules, this.armillary, this.shockwaves, this.milestoneSys, this.core, this.motes, flares, dataDump, kanjiField, field,
     ];
 
     this.buildComposer();
@@ -205,21 +221,35 @@ export class VisualEngine {
     ctx.prevState = from;
     ctx.state = state;
     ctx.stateTime = 0;
+    this.emit({ type: "state", from, to: state });
     this.transitions.enter(from, state);
     for (const s of this.systems) s.onStateChange?.(from, state, ctx);
+  }
+
+  /** Subscribe to semantic visual cues (frame-accurate). Returns an unsubscribe. */
+  onCue(listener: (c: VisualCue) => void): () => void {
+    this.cueListeners.add(listener);
+    return () => this.cueListeners.delete(listener);
+  }
+
+  private emit(c: VisualCue): void {
+    for (const l of this.cueListeners) l(c);
   }
 
   setSignals(signals: VisualSignals): void {
     if (!this.ctx) return;
     if (signals.retries > this.lastRetries) this.transitions.retry();
     this.lastRetries = signals.retries;
+    if (signals.danger !== this.ctx.signals.danger) {
+      this.transitions.setDanger(signals.danger);
+      this.emit({ type: "danger", on: signals.danger });
+    }
     this.ctx.signals = signals;
   }
 
   playMilestone(): void {
     if (!this.ctx) return;
-    this.milestoneSys.play();
-    this.transitions.milestone();
+    this.transitions.milestone(() => this.milestoneSys.play());
   }
 
   get quality(): QualityLevel {
@@ -385,11 +415,18 @@ export class VisualEngine {
     const tr = this.transitions;
     u.uAberration.value = p.aberration * (0.15 + 0.85 * occasional) + tr.glitchKick * 0.8;
     u.uGlitch.value = p.glitch * smoothstep(0.6, 0.92, noise1(t * 1.7, 23)) + tr.glitchKick;
+    // Occasional glitch bursts (CRITICAL) become cues as they start.
+    const g = u.uGlitch.value;
+    if (g > 0.35 && this.lastGlitch <= 0.35) this.emit({ type: "glitch", amount: Math.min(1, g) });
+    this.lastGlitch = g;
     const invertPulse = p.invert > 0.01 ? p.invert * smoothstep(0.7, 0.95, noise1(t * 1.1, 31)) * 6 : 0;
     u.uInvert.value = Math.min(1, invertPulse + tr.invertKick);
     u.uTiles.value = tr.tiles;
+    u.uTileInvert.value = tr.tileInvert;
     u.uFlash.value = this.flashV * 0.3;
     u.uCut.value = tr.cut;
+    u.uWhite.value = tr.white;
+    u.uDefocus.value = tr.defocus;
     u.uCutColor.value.setHex(this.palette.core(tr.cutRole));
     u.uFlashColor.value.setHex(this.palette.core(this.flashRole));
     u.uGrain.value = p.grain;

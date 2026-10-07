@@ -2,7 +2,7 @@ import { Group, Mesh, PlaneGeometry, type ShaderMaterial } from "three";
 import { ROLE } from "../config/palettes";
 import { SEAL } from "../config/visualConfig";
 import { circlePoints, disposeLine, makeLine, polygonPoints, setProgress, type SageLine } from "../core/lines";
-import { damp, noise1, smoothstep } from "../core/math";
+import { damp, easeOutBack, noise1, smoothstep, TAU } from "../core/math";
 import type { EngineContext, VisualSystem } from "../core/types";
 import { scriptMaterial } from "../shaders/ShaderManager";
 
@@ -33,6 +33,11 @@ export class SealSystem implements VisualSystem {
   private seedP = 0;
   private reveal = 0;
   private spin = 0;
+  /** Countdown line around the seal (dangerous decision). */
+  private countdown: SageLine;
+  private countT = 0;
+  private stepTimer = 0;
+  private step = { from: 0, to: 0, t: 1 };
 
   constructor(ctx: EngineContext) {
     const s = SEAL.seedSquare;
@@ -59,6 +64,9 @@ export class SealSystem implements VisualSystem {
     this.script = new Mesh(new PlaneGeometry(size, size), scriptMaterial(ctx.textures.script));
     this.script.frustumCulled = false;
     this.group.add(this.script);
+    this.countdown = makeLine(circlePoints(SEAL.circle + 0.32, 200), 2.2);
+    this.group.add(this.countdown.line);
+    setProgress(this.countdown, 0);
     ctx.scene.add(this.group);
   }
 
@@ -109,7 +117,33 @@ export class SealSystem implements VisualSystem {
     u.uReveal.value = this.reveal;
     u.uOpacity.value = p.script * e * 0.85;
     u.uColor.value.setHex(palette.at(ROLE.primary, SEAL.scriptOuter));
-    this.script.rotation.z += dt * p.scriptSpeed;
+    // Mechanical lock: the script ring stops gliding and turns in heavy steps.
+    if (p.scriptStep > 0.5) {
+      this.stepTimer -= dt;
+      if (this.stepTimer <= 0 && this.step.t >= 1) {
+        this.stepTimer = 1.35;
+        this.step = { from: this.script.rotation.z, to: this.script.rotation.z - TAU / 36, t: 0 };
+        ctx.bus.cue({ type: "gear", heavy: true });
+      }
+    } else {
+      this.stepTimer = 0.5;
+      this.script.rotation.z += dt * p.scriptSpeed;
+    }
+    if (this.step.t < 1) {
+      this.step.t = Math.min(1, this.step.t + dt / 0.45);
+      this.script.rotation.z = this.step.from + (this.step.to - this.step.from) * easeOutBack(this.step.t);
+    }
+
+    // Countdown: an amber line traces the seal while the decision is pending.
+    if (p.countdown > 0.01) {
+      this.countT += dt;
+      setProgress(this.countdown, Math.min(1, this.countT / 24));
+      this.countdown.material.color.setHex(palette.at(ROLE.accent, SEAL.circle));
+      this.countdown.material.opacity = p.countdown * (0.75 + 0.25 * Math.sin(time * 3));
+    } else if (this.countT !== 0) {
+      this.countT = 0;
+      setProgress(this.countdown, 0);
+    }
     this.script.visible = u.uOpacity.value > 0.003 && this.reveal > 0.002;
   }
 
@@ -119,7 +153,7 @@ export class SealSystem implements VisualSystem {
 
   destroy(): void {
     this.group.parent?.remove(this.group);
-    for (const l of [this.seedA, this.seedB, ...this.stages.map((s) => s.l)]) disposeLine(l);
+    for (const l of [this.seedA, this.seedB, this.countdown, ...this.stages.map((s) => s.l)]) disposeLine(l);
     this.script.geometry.dispose();
     this.script.material.dispose();
   }

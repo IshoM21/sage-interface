@@ -6,6 +6,7 @@ export const readyVisual: StateVisual = {
   state: "READY",
   palette: PALETTES.READY,
   params: {
+    shards: 0.22, shardSpeed: 0.12, network: 0.12,
     camDolly: 0, camOrbit: 0.25, camSway: 0.5,
     energy: 0.8, coreGlow: 0.35, coreBreathAmp: 0.07, coreBreathRate: 0.1,
     seed: 1, unfold: 0, script: 0, sealTilt: 0.45,

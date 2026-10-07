@@ -6,6 +6,7 @@ export const warningVisual: StateVisual = {
   state: "WARNING",
   palette: PALETTES.WARNING,
   params: {
+    shards: 0.6, shardSpeed: 0.6, network: 0.55,
     camDolly: 0.04, camOrbit: 0.4, camSway: 0.6, camShake: 0.15,
     energy: 0.95, coreGlow: 0.7, coreBreathAmp: 0.04, coreBreathRate: 0.2,
     seed: 0.4, unfold: 1, script: 0.7, scriptSpeed: 0.12, sealTilt: 0.3,

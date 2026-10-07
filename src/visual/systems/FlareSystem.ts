@@ -40,7 +40,7 @@ export class FlareSystem implements VisualSystem {
       const px = -ctx.pointer.x * 0.08 * h.drift;
       const py = ctx.pointer.y * 0.08 * h.drift;
       h.s.position.set((h.x + px) * halfW, (h.y + py + Math.sin(time * 0.1 + h.drift) * 0.02) * halfH, -DEPTH);
-      h.s.scale.setScalar(h.size * halfH * 2);
+      h.s.scale.setScalar(h.size * Math.min(halfH, halfW) * 2);
       h.s.material.opacity = p.flare * h.alpha * Math.min(1, p.energy);
       h.s.material.rotation = time * 0.02 * h.drift;
     }

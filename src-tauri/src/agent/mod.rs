@@ -25,7 +25,12 @@ pub enum AgentEvent {
     #[serde(rename = "tool.completed")]
     ToolCompleted { tool: String },
     #[serde(rename = "agent.question")]
-    Question { message: String },
+    Question {
+        message: String,
+        /// The agent asks to run something destructive (drives the mechanical seal).
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        danger: bool,
+    },
     #[serde(rename = "agent.warning")]
     Warning { message: String },
     #[serde(rename = "agent.completed")]

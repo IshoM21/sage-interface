@@ -23,10 +23,37 @@ export interface VisualSignals {
   completedModules: readonly ToolModule[];
   /** Monotonic retry counter; a change triggers the "repeating attempt" beat. */
   retries: number;
+  /** A dangerous decision is pending (mechanical seal). */
+  danger: boolean;
 }
+
+/**
+ * Semantic "something just happened on screen" notifications, emitted at the
+ * exact frame they occur. The engine knows nothing about audio; a host can
+ * subscribe (VisualEngine.onCue) to sync sound, haptics, logging…
+ */
+export type VisualCue =
+  | { type: "state"; from: SageState; to: SageState }
+  | { type: "cut" }
+  | { type: "flash"; amount: number }
+  | { type: "shock"; strength: number }
+  | { type: "punch"; amount: number }
+  | { type: "pulse"; strength: number }
+  | { type: "glitch"; amount: number }
+  | { type: "resolve" }
+  | { type: "retry" }
+  | { type: "retryStep"; step: number }
+  | { type: "milestone"; phase: "start" | "release" }
+  | { type: "module" }
+  | { type: "heartbeat" }
+  | { type: "corrupt"; duration: number }
+  | { type: "whiteout"; rise: number; hold: number; fall: number }
+  | { type: "danger"; on: boolean }
+  | { type: "gear"; heavy: boolean };
 
 /** Cross-system effects. Implemented by the engine, consumed by any system. */
 export interface VisualBus {
+  cue(c: VisualCue): void;
   shockwave(opts: { speed?: number; width?: number; strength?: number; role?: number; distort?: number }): void;
   burst(x: number, y: number, count: number, speed: number, role: number, life?: number): void;
   flash(amount: number, role?: number): void;

@@ -1,5 +1,8 @@
 import type { SageState } from "../../machine/events";
-import { GOLD, ROLE } from "../config/palettes";
+import { CORRUPT } from "../../shared/critical";
+import { MILESTONE_LEAD, WHITEOUT } from "../../shared/milestone";
+import { RETRY, RETRY_PHASES } from "../../shared/retry";
+import { GOLD, ROLE, SOLEMN } from "../config/palettes";
 import { STATE_VISUALS, targetParams } from "../states";
 import type { CameraDirector } from "./CameraDirector";
 import type { PaletteField } from "./PaletteField";
@@ -7,8 +10,6 @@ import type { ParamController } from "./params";
 import type { VisualBus } from "./types";
 
 /** Retry beat timing (s): when the frame splits into 4, into 9, and returns to 1. */
-export const RETRY_TIMING = { grid4: 0.36, grid9: 0.9, end: 1.4 } as const;
-
 interface Cue {
   at: number;
   run: () => void;
@@ -31,8 +32,24 @@ export class TransitionController {
   private t = 0;
   glitchKick = 0;
   invertKick = 0;
-  /** Retry grid: 1 = off, 2/3 = frame repeated in a grid. */
+  /** Retry grid: 1 = off, N = frame repeated in an N×N grid. */
   tiles = 1;
+  /** Focus pull (0 = sharp, 1 = fully defocused) for the composite. */
+  defocus = 0;
+  private focusT = -1;
+  private danger = false;
+  /** White immersion amount (0..1) for the composite. */
+  white = 0;
+  private whiteT = -1;
+  /** Fraction of grid cells shown as failure (inverted) frames. */
+  tileInvert = 0;
+  /** Inversion held during the FAILED phase of a retry. */
+  private failHold = 0;
+  private retryUntil = 0;
+  private retryToken = 0;
+  private retryStreak = 0;
+  private lastRetryAt = -100;
+  private montageLevel = 0;
   /** Full-frame cut flash: amount and role, held for a couple of frames. */
   cut = 0;
   cutRole: number = ROLE.core;
@@ -49,6 +66,7 @@ export class TransitionController {
 
   /** A hard editing cut: 1–2 frames of solid light. */
   private flashCut(role: number = ROLE.core, frames = 2, amount = 0.85): void {
+    this.bus.cue({ type: "cut" });
     this.cut = amount;
     this.cutRole = role;
     this.cutFrames = frames;
@@ -73,7 +91,7 @@ export class TransitionController {
     }
 
     const live = this.params.live;
-    if (to === "WARNING" || to === "CRITICAL" || to === "QUESTION") {
+    if (to === "WARNING" || to === "QUESTION") {
       // The previous energy dims briefly before the new state takes over.
       this.params.override({ energy: live.energy * 0.55 });
       this.at(0.22, () => this.params.release("energy"));
@@ -134,26 +152,7 @@ export class TransitionController {
         break;
       }
       case "CRITICAL":
-        this.flashCut(ROLE.primary, 2, 0.9);
-        this.glitchKick = 1;
-        this.invertKick = 1;
-        this.bus.flash(0.3, ROLE.primary);
-        this.bus.shockwave({ speed: 11, width: 0.3, strength: 1, distort: 1, role: ROLE.primary });
-        this.bus.burst(0, 0, 140, 8, ROLE.secondary, 1.3);
-        this.cam.play(
-          { channel: "shake", amount: 0.22, attack: 0.04, release: 1.1, style: "punch" },
-          { channel: "roll", amount: -0.12, attack: 0.08, release: 1, style: "punch" },
-          { channel: "dolly", amount: 0.2, attack: 0.08, release: 0.9, style: "punch" },
-        );
-        this.at(0.32, () => {
-          this.glitchKick = 0.8;
-          this.invertKick = 0.85;
-          this.bus.shockwave({ speed: 7, width: 0.15, strength: 0.8, distort: 0.5, role: ROLE.primary });
-          this.cam.play(
-            { channel: "shake", amount: 0.12, attack: 0.03, release: 0.6, style: "punch" },
-            { channel: "roll", amount: 0.07, attack: 0.06, release: 0.8, style: "punch" },
-          );
-        });
+        this.criticalChoreography();
         break;
       case "COMPLETE":
         this.completeChoreography(from);
@@ -161,6 +160,51 @@ export class TransitionController {
       default:
         break;
     }
+  }
+
+  /**
+   * CRITICAL: first the corrupted-data interlude (the scene goes dark while
+   * lines of script are written, smeared and thinned out, then a camera whip),
+   * then the failure hits: red cut, inversion, datamosh, shockwave, ejection.
+   */
+  private criticalChoreography(): void {
+    this.bus.cue({ type: "corrupt", duration: CORRUPT.duration });
+    this.params.override({
+      energy: 0.12, nebula: 0.12, tunnel: 0, panels: 0, armillary: 0.1, flare: 0, bloom: 0.45,
+      glitch: 0, aberration: 0, motes: 0.05, script: 0.1,
+    });
+    this.cam.move({ channel: "dolly", amount: -0.05, attack: 0.3, hold: 0.5, release: 0.4 });
+    this.at(CORRUPT.whipAt, () => {
+      this.glitchKick = 0.7;
+      this.cam.play(
+        { channel: "dolly", amount: 0.34, attack: 0.12, release: 0.5, style: "punch" },
+        { channel: "roll", amount: 0.22, attack: 0.12, release: 0.6, style: "punch" },
+        { channel: "fov", amount: -6, attack: 0.12, release: 0.5, style: "punch" },
+      );
+    });
+    this.at(CORRUPT.duration, () => {
+      this.params.releaseAll();
+      this.flashCut(ROLE.primary, 2, 0.9);
+      this.glitchKick = 1;
+      this.invertKick = 1;
+      this.bus.flash(0.3, ROLE.primary);
+      this.bus.shockwave({ speed: 11, width: 0.3, strength: 1, distort: 1, role: ROLE.primary });
+      this.bus.burst(0, 0, 140, 8, ROLE.secondary, 1.3);
+      this.cam.play(
+        { channel: "shake", amount: 0.22, attack: 0.04, release: 1.1, style: "punch" },
+        { channel: "roll", amount: -0.12, attack: 0.08, release: 1, style: "punch" },
+        { channel: "dolly", amount: 0.2, attack: 0.08, release: 0.9, style: "punch" },
+      );
+    });
+    this.at(CORRUPT.duration + 0.32, () => {
+      this.glitchKick = 0.8;
+      this.invertKick = 0.85;
+      this.bus.shockwave({ speed: 7, width: 0.15, strength: 0.8, distort: 0.5, role: ROLE.primary });
+      this.cam.play(
+        { channel: "shake", amount: 0.12, attack: 0.03, release: 0.6, style: "punch" },
+        { channel: "roll", amount: 0.07, attack: 0.06, release: 0.8, style: "punch" },
+      );
+    });
   }
 
   /**
@@ -176,6 +220,7 @@ export class TransitionController {
     this.cam.move({ channel: "dolly", amount: 0.14, attack: 0.95, hold: 0.05, release: 0.25 });
     this.cam.move({ channel: "fov", amount: -3, attack: 0.95, release: 0.3 });
     this.at(1.0, () => {
+      this.bus.cue({ type: "resolve" });
       // …then the release: a cut of light and the camera thrown back.
       this.flashCut(ROLE.core, 2, 0.95);
       this.cam.play(
@@ -194,13 +239,32 @@ export class TransitionController {
   }
 
   /** Gold "ultimate" ceremony; timing mirrors MilestoneSystem. */
-  milestone(): void {
+  /**
+   * Milestone: a white immersion first (light rises, holds pure white, falls
+   * away); the gold ceremony starts behind the white so the scene is revealed
+   * already transformed. `onCeremony` starts the seal (MilestoneSystem).
+   */
+  milestone(onCeremony: () => void): void {
     this.inMilestone = true;
+    this.whiteT = 0;
+    this.bus.cue({ type: "whiteout", rise: WHITEOUT.rise, hold: WHITEOUT.hold, fall: WHITEOUT.fall });
+    // Light swells toward the white: flares and core bloom out.
+    this.params.override({ flare: 1.4, coreGlow: 2.4, bloom: 1.3, energy: 1.2 });
+    this.at(MILESTONE_LEAD, () => {
+      this.params.release("flare", "coreGlow", "bloom", "energy");
+      onCeremony();
+      this.ceremony();
+    }, true);
+  }
+
+  private ceremony(): void {
+    this.bus.cue({ type: "milestone", phase: "start" });
     this.palette.start(GOLD, [{ to: 1, duration: 0.6 }]);
     this.params.override({ energy: 0.7, tunnel: 0, tunnelSpeed: 0.05, armillary: 0.25, panels: 0, nebula: 0.9, flare: 1, script: 0 });
     // The camera withdraws while the seal is inscribed…
     this.cam.move({ channel: "dolly", amount: -0.22, attack: 1.7, hold: 0.15, release: 0.15 });
     this.at(1.9, () => {
+      this.bus.cue({ type: "milestone", phase: "release" });
       // …and slams in at the release.
       this.flashCut(ROLE.core, 2, 1);
       this.cam.play(
@@ -218,32 +282,120 @@ export class TransitionController {
     }, true);
   }
 
-  /** "Failed. Repeating attempt." — inversion flash, datamosh, frame repeated in a grid. */
+  /**
+   * Dangerous decision (QUESTION with danger): no scene change — Sage's own
+   * seal "turns serious". The world around it falls away (tunnel, panels,
+   * nebula), the script ring locks and turns in heavy mechanical steps, the
+   * bands freeze, an amber countdown traces the seal and the light goes solemn.
+   */
+  setDanger(on: boolean): void {
+    if (on === this.danger) return;
+    this.danger = on;
+    const keys = [
+      "tunnel", "panels", "nebula", "motes", "flare", "bloom", "rain", "stars", "unfold", "script", "scriptSpeed",
+      "scriptStep", "countdown", "armillary", "armSpeed", "armStep", "vignette", "coreGlow", "camOrbit", "camSway", "sealTilt",
+      "shards", "shardSpeed", "network",
+    ] as const;
+    if (on) {
+      this.palette.start(SOLEMN, [{ to: 0.5, duration: 0.5, hold: 0.25 }, { to: 1, duration: 0.6 }]);
+      this.params.override({
+        tunnel: 0, panels: 0, nebula: 0.08, motes: 0.05, flare: 0, bloom: 0.5, rain: 0, stars: 0.25,
+        unfold: 1, script: 1, scriptSpeed: 0, scriptStep: 1, countdown: 1,
+        armillary: 0.35, armSpeed: 0, armStep: 0, vignette: 1, coreGlow: 0.55,
+        camOrbit: 0, camSway: 0, sealTilt: 0, shards: 0.12, shardSpeed: 0, network: 0,
+      });
+      this.cam.move({ channel: "dolly", amount: 0.06, attack: 1.4, hold: 600, release: 0.8 });
+    } else {
+      this.params.release(...keys);
+      this.palette.start(STATE_VISUALS[this.state].palette, [{ to: 1, duration: 0.6 }]);
+      this.cam.clear();
+    }
+  }
+
+  /**
+   * One failed attempt and its retry, timed after the anime (see shared/retry.ts):
+   * glitch → FAILED (paper/red inversion held) → REPEATING ATTEMPT → attempt surge.
+   * From the third retry of a streak the failure/retry happen inside a growing
+   * grid whose cells mix attempt (normal) and failure (inverted) frames.
+   * Retries arriving while a cycle is still playing escalate the grid instead.
+   */
   retry(): void {
-    this.invertKick = 1;
+    const now = this.t;
+    this.retryStreak = now - this.lastRetryAt < RETRY.streakGap ? this.retryStreak + 1 : 0;
+    this.lastRetryAt = now;
+
+    if (now < this.retryUntil) {
+      // Quick succession: escalate the montage.
+      this.montageLevel = Math.min(this.montageLevel + 1, RETRY.montageGrid.length - 1);
+      this.setGrid(RETRY.montageGrid[this.montageLevel], 0.6);
+      this.glitchKick = Math.max(this.glitchKick, 0.9);
+      this.retryUntil = Math.max(this.retryUntil, now + 1.2);
+      const token = ++this.retryToken;
+      this.at(1.2, () => token === this.retryToken && this.endRetry());
+      return;
+    }
+
+    const montage = this.retryStreak >= RETRY.montageFrom;
+    const token = ++this.retryToken;
+    const live = (fn: () => void) => () => token === this.retryToken && fn();
+    this.retryUntil = now + RETRY_PHASES.end;
+    this.montageLevel = 0;
+
+    // 1) glitch: the attempt breaks.
+    this.bus.cue({ type: "retry" });
     this.glitchKick = 1;
     this.flashCut(ROLE.core, 1, 0.8);
     this.bus.shockwave({ speed: 9, width: 0.2, strength: 0.7, distort: 0.6, role: ROLE.primary });
-    const punch = () =>
+    this.cam.move({ channel: "shake", amount: 0.08, attack: 0.03, release: 0.3, style: "punch" });
+
+    // 2) FAILED: hold the paper/red inversion (montage: inside a growing grid).
+    this.at(RETRY_PHASES.failedAt, live(() => {
+      this.failHold = montage ? 0 : 0.85;
       this.cam.play(
-        { channel: "dolly", amount: 0.16, attack: 0.05, release: 0.22, style: "punch" },
-        { channel: "shake", amount: 0.06, attack: 0.03, release: 0.2, style: "punch" },
+        { channel: "shake", amount: 0.1, attack: 0.03, release: 0.6, style: "punch" },
+        { channel: "roll", amount: -0.06, attack: 0.06, release: 0.9, style: "punch" },
       );
-    punch();
-    this.at(RETRY_TIMING.grid4, () => {
-      this.tiles = 2;
-      this.invertKick = Math.max(this.invertKick, 0.5);
-      punch();
-    });
-    this.at(RETRY_TIMING.grid9, () => {
-      this.tiles = 3;
-      this.invertKick = Math.max(this.invertKick, 0.5);
-      punch();
-    });
-    this.at(RETRY_TIMING.end, () => {
-      this.tiles = 1;
-      this.glitchKick = 0.6;
-    });
+      if (montage) {
+        this.setGrid(RETRY.montageGrid[0], 0.75);
+        this.at(RETRY.failed * 0.45, live(() => this.setGrid(RETRY.montageGrid[1], 0.7)));
+      }
+    }));
+
+    // 3) REPEATING ATTEMPT: back to normal light (montage: more cells recover).
+    this.at(RETRY_PHASES.repeatAt, live(() => {
+      this.failHold = 0;
+      this.invertKick = 0.5;
+      if (montage) {
+        this.setGrid(RETRY.montageGrid[2], 0.45);
+        this.at(RETRY.repeat * 0.5, live(() => this.setGrid(RETRY.montageGrid[3], 0.3)));
+      }
+    }));
+
+    // 4) attempt surge: grid collapses, flash, the camera is thrown in again.
+    this.at(RETRY_PHASES.attemptAt, live(() => {
+      this.setGrid(1, 0);
+      this.flashCut(ROLE.core, 1, 0.7);
+      this.bus.flash(0.5);
+      this.params.override({ tunnelSpeed: 2.6 });
+      this.cam.play(
+        { channel: "dolly", amount: 0.24, attack: 0.12, hold: 0.05, release: 0.9, style: "punch" },
+        { channel: "fov", amount: -4, attack: 0.12, release: 0.8, style: "punch" },
+      );
+    }));
+    this.at(RETRY_PHASES.end, live(() => this.endRetry()));
+  }
+
+  private setGrid(cells: number, invertRatio: number): void {
+    if (cells !== this.tiles && cells > 1) this.bus.cue({ type: "retryStep", step: cells * cells });
+    this.tiles = cells;
+    this.tileInvert = invertRatio;
+  }
+
+  private endRetry(): void {
+    this.setGrid(1, 0);
+    this.failHold = 0;
+    this.params.release("tunnelSpeed");
+    this.retryUntil = 0;
   }
 
   update(dt: number): void {
@@ -252,7 +404,24 @@ export class TransitionController {
     if (this.cutFrames > 0) this.cutFrames--;
     else this.cut = Math.max(0, this.cut - dt * 12);
     this.glitchKick = Math.max(0, this.glitchKick - dt * 2.2);
-    this.invertKick = Math.max(0, this.invertKick - dt * 3.2);
+    this.invertKick = Math.max(this.failHold, this.invertKick - dt * 3.2);
+    if (this.focusT >= 0) {
+      // Out of focus for a moment, then the focus snaps in.
+      this.focusT += dt;
+      this.defocus = this.focusT < 0.45 ? 1 : Math.max(0, 1 - ((this.focusT - 0.45) / 0.9) ** 0.6);
+      if (this.focusT > 1.5) this.focusT = -1;
+    }
+    if (this.whiteT >= 0) {
+      this.whiteT += dt;
+      const { rise, hold, fall } = WHITEOUT;
+      const w = this.whiteT;
+      // Rise eases in (light accumulating), fall eases out.
+      this.white = w < rise ? (w / rise) ** 2.2 : w < rise + hold ? 1 : Math.max(0, 1 - ((w - rise - hold) / fall) ** 0.7);
+      if (w > rise + hold + fall) {
+        this.whiteT = -1;
+        this.white = 0;
+      }
+    }
     if (!this.cues.length) return;
     for (let i = 0; i < this.cues.length; i++) {
       const c = this.cues[i];

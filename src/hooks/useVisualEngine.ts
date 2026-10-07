@@ -45,6 +45,7 @@ export function useVisualEngine(
           activeModule: snap.context.activeModule,
           completedModules: snap.context.completedModules,
           retries: snap.context.retries,
+          danger: snap.matches({ agent: "question" }) && snap.context.danger,
         });
         const m = snap.matches({ overlay: "milestone" }) ? snap.context.milestone : null;
         if (m && m !== lastMilestone) e.playMilestone();

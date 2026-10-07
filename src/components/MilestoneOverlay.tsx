@@ -1,10 +1,12 @@
 import { AnimatePresence, motion } from "motion/react";
 import { SageActor } from "../hooks/sageActor";
 import { selectMilestone } from "../machine/selectors";
+import { MILESTONE_LEAD } from "../shared/milestone";
+import { DiamondFrame } from "./DiamondCard";
 
 const ease = [0.16, 1, 0.3, 1] as const;
-/** Matches MILESTONE_RELEASE in the engine: text lands with the flash. */
-const RELEASE = 1.9;
+/** Matches MILESTONE_RELEASE in the engine (after the white lead): text lands with the flash. */
+const RELEASE = MILESTONE_LEAD + 1.9;
 
 /** Text for the MILESTONE / SKILL ACQUIRED ceremony, in the gold register. */
 export function MilestoneOverlay() {
@@ -34,7 +36,9 @@ export function MilestoneOverlay() {
             transition={{ delay: RELEASE, duration: 0.4, ease }}
           >
             <span className="milestone__kicker">ULTIMATE · SKILL</span>
-            <span className="milestone__kanji">獲得</span>
+            <DiamondFrame tone="gold">
+              <span className="dcard__kanji dcard__kanji--n2 milestone__kanji">獲得</span>
+            </DiamondFrame>
           </motion.div>
           <motion.div
             className="milestone__title"

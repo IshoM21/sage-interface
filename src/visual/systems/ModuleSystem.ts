@@ -88,6 +88,7 @@ export class ModuleSystem implements VisualSystem {
       if (s && p.modules > 0.5) {
         s.ping = 1;
         bus.burst(s.group.position.x, s.group.position.y, 30, 1.6, ROLE.accent, 0.7);
+        bus.cue({ type: "module" });
       }
     }
     const lit = palette.at(ROLE.accent, SEAL.moduleRadius);

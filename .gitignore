@@ -4,3 +4,11 @@ src-tauri/target
 src-tauri/gen/schemas
 .DS_Store
 *.log
+
+# Local reference media (copyrighted, never commit)
+*.mp4
+*.mkv
+*.mov
+*.webm
+references/
+caps/

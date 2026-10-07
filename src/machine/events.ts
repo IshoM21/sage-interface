@@ -16,7 +16,8 @@ export type AgentEvent =
   | { type: "agent.analyzing" }
   | { type: "tool.started"; tool: string }
   | { type: "tool.completed"; tool: string }
-  | { type: "agent.question"; message: string }
+  /** `danger`: the agent asks to run something destructive (rm -rf, force push…). */
+  | { type: "agent.question"; message: string; danger?: boolean }
   | { type: "agent.warning"; message: string }
   | { type: "agent.completed"; summary?: string }
   | { type: "agent.failed"; error: string }

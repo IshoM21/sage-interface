@@ -10,16 +10,20 @@ Current status: **visual POC (v2, Three.js)**. The eight states, transitions, AU
 
 | State | Scene | Card |
 |---|---|---|
-| READY | only the **seed**: a thin double square tilted in the void | 待機 Standing by |
-| LISTENING | the seed unfolds, light flows inward, the bands wake | 聴取 Listening |
-| ANALYZING | tunnel with panels, armillary bands on every axis, full seal and script ring | 解析 Analyzing |
-| EXECUTING | faster travel, bands in mechanical steps, module sigils (READ…TEST) | 実行 Executing |
-| QUESTION | everything stops; the seal turns to face you | 問 Question |
-| COMPLETE | convergence, bands aligned in one plane, flash, blue rain of light | 了 Understood |
+| READY | only the **seed**: a thin double square tilted in the void; a few data shards | 待機 Standing by |
+| LISTENING | the seed unfolds, light flows inward, the line network appears | 聴取 Listening |
+| ANALYZING | an **iris** opens; tunnel, armillary bands, full seal, **kanji drifting** through depth, a full background (shards, dust, beaded line network, arcs) | 解析 Analyzing |
+| EXECUTING | faster travel, bands in mechanical steps, module sigils (READ…TEST), shards flying | 実行 Executing |
+| QUESTION | everything freezes; **▸YES / NO** in serif (←/→, Enter, Esc) | 問 Question |
+| dangerous QUESTION | the seal "turns serious": surroundings go black, the script ring turns in heavy steps, amber countdown, fixed 告 diamond | 告 Warning |
+| COMPLETE | convergence, flash, rain of light and a **報告 report** adding results one by one | 報告 |
 | WARNING | amber pulses that transform the scene in stages, wobbling bands | 警告 Warning |
-| CRITICAL | inversion to paper and red, datamosh, fragmentation, ejected light | 失敗 Failed |
-| retry | «Failed. Repeating attempt.»: inversion and the frame repeated in a grid | 再度実行 |
-| milestone | gold ceremony: ornate script ring, dodecagon, rays | 獲得 Ultimate skill |
+| CRITICAL | **corrupted-data interlude**, then inversion to paper and red, datamosh, fragmentation | 失敗 Failed |
+| retry | full cycle: glitch → 失敗 → 再度実行 → new attempt; from the 3rd in a row, a grid montage | 再度実行 |
+| milestone | **white immersion** and gold ceremony: ornate script ring, dodecagon, rays | 獲得 Ultimate skill |
+| boot | **identity**: the diamond is born, the kanji is assembled (`src/config/identity.ts`, 叡 by default) and the name is typed | 叡 |
+
+Emblems: the **white disc** (black kanji) is Great Sage's form for answers and confirmations; the **diamond** is reserved for warnings (告). Each card's text is **assembled** glyph by glyph, with synced sound.
 
 ---
 
@@ -66,7 +70,10 @@ cd src-tauri && cargo test   # AgentEvent serialization in Rust
 | `T` | FULL TOUR (includes QUESTION, WARNING and MILESTONE) |
 | `M` | MILESTONE / SKILL ACQUIRED |
 | `R` | retry beat (`agent.retry`) |
-| `Enter` / `Esc` | ACCEPT / REJECT in QUESTION |
+| `S` | sound on/off (volume lives in the controls panel) |
+| `9` | dangerous question (`agent.question` with `danger: true`) |
+| `I` | replay the identity sequence |
+| `←/→`, `Enter`, `Esc` | pick YES/NO, confirm, answer NO (in QUESTION) |
 | `D` / `C` / `H` | debug / controls / hide the whole UI |
 | `Q` | cycles quality LOW → MEDIUM → HIGH → ULTRA |
 | `F` | fullscreen |
@@ -94,6 +101,7 @@ React (UI, 0 renders per frame)
 
 ```
 src/
+  audio/          AudioEngine (Web Audio synthesis), profiles (per-state sound design)
   app/            App.tsx, styles, state catalog (UI copy), fullscreen
   machine/        events.ts (AgentEvent), sageMachine.ts, selectors.ts, tests
   agent/          AgentBridge, MockAgentBridge, TauriAgentBridge, scenarios
@@ -136,6 +144,15 @@ src-tauri/src/
    - schedules **cues** (flash, shockwaves, temporary overrides) and **camera moves / cuts**. E.g. COMPLETE: the tunnel decelerates → light converges → the bands align in one plane → flash → radial wave → rain of light → (UI) the 了 card at 1.25 s, synchronized with the machine's `complete.resolved` substate.
 
 ---
+
+## Sound
+
+All audio is **procedural** (Web Audio API): no sound files, ~25 KB of code and <1% CPU. It lives in `src/audio/`:
+
+- `AudioEngine.ts` — ambient drone (5 voices → LFO-driven filter → optional saturation), reverb with a generated impulse response, compressor, and synthesized effects: FM chime (each voice line), deep hit (cards), fizz (cuts), whoosh (camera punches), boom (shockwaves), glitch (failures/retries), heartbeat (QUESTION), arpeggio and chord (milestone).
+- `profiles.ts` — per-state sound design: drone notes, filter, air, sparkles (thinking), mechanical ticks (acting), saturation (failure).
+- **Sync:** the renderer emits semantic *cues* on the exact frame they happen (`VisualEngine.onCue`: `cut`, `punch`, `shock`, `pulse`, `retryStep`, `milestone`, `heartbeat`…). Audio only listens to those cues; the renderer knows nothing about sound.
+- Browsers/WebViews require a user gesture to start audio: it starts on the first key or click. Volume and mute are stored in `localStorage`.
 
 ## Adding a new state
 
@@ -223,4 +240,4 @@ Measured in Chrome (Metal) at 2880×1800, DPR 2, HIGH quality: **60 FPS** in all
 3. **Adapters (`AgentAdapter`):** translate each CLI's output into `AgentEvent`. Prefer structured channels when available (e.g. JSON/stream output or agent hooks) over parsing ANSI text.
 4. **Real approvals:** `ui.accept`/`ui.reject` → a Rust command that answers the agent's prompt.
 5. **More agent feedback:** map real progress (files read, tests passing) to parameters (`unfold`, panel density) so the scene reflects the work, not just the state.
-6. **Sound:** a crystalline tone when each voice line and card appears.
+6. **Voice:** pre-generated fixed phrases («Notice.», «Answer.», «Understood.»…) with a "system" treatment, triggered by the same cues as the sound.

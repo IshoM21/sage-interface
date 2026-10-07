@@ -33,6 +33,11 @@ export const PALETTES: Record<SageState, Palette> = {
   CRITICAL: { primary: 0xff4050, secondary: 0xff7680, accent: 0xffffff, core: 0xffeef0, dim: 0x5a1a20, field: 0x2a0408, field2: 0x1c0412 },
 };
 
+/** Solemn: dangerous decisions — pale light, amber accents, an almost black field. */
+export const SOLEMN: Palette = {
+  primary: 0xe9dcbc, secondary: 0x98a8b6, accent: 0xffb84a, core: 0xfff1d6, dim: 0x3a3326, field: 0x07080c, field2: 0x0e0b07,
+};
+
 /** Ceremonial gold, used only by the milestone ("ultimate") sequence. */
 export const GOLD: Palette = {
   primary: 0xffb23c, secondary: 0xffd27a, accent: 0xfff4d6, core: 0xffffff, dim: 0x6a3a10, field: 0x2c1204, field2: 0x3a1a06,

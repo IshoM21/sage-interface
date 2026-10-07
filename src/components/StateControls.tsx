@@ -11,6 +11,8 @@ interface Props {
   onFullTour: () => void;
   onMilestone: () => void;
   onRetry: () => void;
+  onDanger: () => void;
+  sound: { muted: boolean; volume: number; toggleMuted: () => void; setVolume: (v: number) => void };
   demoRunning: boolean;
   warning: string;
   onWarning: (w: string) => void;
@@ -80,7 +82,28 @@ export function StateControls(p: Props) {
         <button className="btn" onClick={p.onRetry} title="agent.retry">
           RETRY <kbd>R</kbd>
         </button>
+        <button className="btn" onClick={p.onDanger} title="agent.question { danger: true }">
+          DANGER <kbd>9</kbd>
+        </button>
       </div>
+      <header className="panel__head">SOUND</header>
+      <div className="controls__row controls__sound">
+        <button className={`chip chip--small ${p.sound.muted ? "" : "chip--on"}`} onClick={p.sound.toggleMuted}>
+          <kbd>S</kbd>
+          {p.sound.muted ? "OFF" : "ON"}
+        </button>
+        <input
+          className="range"
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={p.sound.volume}
+          aria-label="Volume"
+          onChange={(e) => p.sound.setVolume(Number(e.target.value))}
+        />
+      </div>
+
       <label className="toggle">
         <input
           type="checkbox"

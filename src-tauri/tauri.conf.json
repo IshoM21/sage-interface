@@ -14,17 +14,17 @@
       {
         "label": "main",
         "title": "Sage Interface",
-        "width": 1440,
-        "height": 900,
+        "width": 1280,
+        "height": 720,
         "minWidth": 720,
-        "minHeight": 480,
-        "maximized": true,
+        "minHeight": 720,
         "resizable": true,
-        "fullscreen": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "backgroundColor": "#010507",
-        "transparent": false
+        "transparent": false,
+        "center": true,
+        "visible": false
       }
     ],
     "security": {
@@ -33,7 +33,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "category": "DeveloperTool",
     "icon": [
       "icons/32x32.png",
@@ -42,6 +45,8 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "macOS": { "minimumSystemVersion": "13.0" }
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
   }
 }
